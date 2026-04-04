@@ -158,3 +158,12 @@ MODULES.md
 TASKS.md
 IMPLEMENTATION_START_HERE.md
 # Add other unwanted .md files here if needed
+
+
+files-recurrsive.txt
+files.txt
+
+#unwanted files
+*.log
+*.tmp
+*.bak       
