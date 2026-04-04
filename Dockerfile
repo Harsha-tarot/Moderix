@@ -14,8 +14,7 @@ COPY graders/ ./graders/
 COPY data/ ./data/
 
 # Set environment defaults
-ENV API_BASE_URL=https://router.huggingface.co/v1
-ENV MODEL_NAME=Qwen/Qwen2.5-72B-Instruct
-# ENV HF_TOKEN=hf_xxxxx
+ENV GEMINI_MODEL_NAME=gemini-1.5-flash
+# ENV GEMINI_API_KEY=YOUR_API_KEY
 
 CMD ["python", "inference.py"]

@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import uuid
+import random
 from datetime import datetime, timezone
 from typing import Optional, List, Tuple
 from pydantic import BaseModel, Field
@@ -56,7 +57,7 @@ class ContentModerationEnv:
                 data_path = "data/training_set.json"
                 print(f"[DEBUG] Path doesn't exist, falling back to: {data_path}")
                 
-            with open(data_path, "r") as f:
+            with open(data_path, "r", encoding="utf-8") as f:
                 dataset = json.load(f)
                 self.gold_labels = {item["id"]: item for item in dataset}
                 print(f"[INFO] Loaded {len(self.gold_labels)} gold labels")
@@ -74,8 +75,6 @@ class ContentModerationEnv:
         self.episode_rewards = []
         self.decisions_made = []
         
-        # Load a batch of posts (8 posts from gold_labels)
-        import random
         all_posts = list(self.gold_labels.values())
         if len(all_posts) < 8:
             self.current_batch = all_posts

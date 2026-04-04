@@ -117,9 +117,8 @@ pip install -r requirements.txt
 
 ### Environment Variables
 ```bash
-export HF_TOKEN="your_huggingface_token_here"
-export API_BASE_URL="https://router.huggingface.co/v1"
-export MODEL_NAME="Qwen/Qwen2.5-72B-Instruct"
+export GEMINI_API_KEY="your_gemini_api_key_here"
+export GEMINI_MODEL_NAME="gemini-1.5-flash"
 ```
 
 *Complete setup guide in [REQUIREMENTS.md](REQUIREMENTS.md)*
@@ -297,9 +296,8 @@ pip install -r requirements.txt
 ### Environment Variables
 Create a `.env` file in the root directory or export these variables directly to your shell:
 ```bash
-export HF_TOKEN="your_huggingface_token_here"
-export API_BASE_URL="https://router.huggingface.co/v1"
-export MODEL_NAME="Qwen/Qwen2.5-72B-Instruct"
+export GEMINI_API_KEY="your_gemini_api_key_here"
+export GEMINI_MODEL_NAME="gemini-1.5-flash"
 ```
 
 ## 11. Usage
@@ -367,9 +365,8 @@ Moderix/
 ```
 
 ## 14. API Credentials Required
-- **HF_TOKEN**: Your personal HuggingFace API token. You can generate one at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens).
-- **API_BASE_URL**: The endpoint for the LLM router. Default is set to the HuggingFace Inference Router.
-- **MODEL_NAME**: The specific model identifier. While the environment is model-agnostic, `Qwen2.5-72B-Instruct` is recommended for baseline reproducibility.
+- **GEMINI_API_KEY**: Your Google AI Studio API token. Generate one at [aistudio.google.com](https://aistudio.google.com).
+- **GEMINI_MODEL_NAME**: The specific model identifier. `gemini-1.5-flash` or `gemini-1.5-pro` are recommended.
 
 ## 15. Evaluation Criteria
 

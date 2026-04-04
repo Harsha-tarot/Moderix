@@ -2,17 +2,19 @@
 import asyncio
 import os
 import json
+import re
 from typing import List, Optional
-from openai import OpenAI
+import google.generativeai as genai
 from my_env import ContentModerationEnv, Action
 from dotenv import load_dotenv
 
-# Load .env file if it exists
+# Load .env file
 load_dotenv()
 
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
+# Gemini Configuration
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
+
 TASK_NAME = "content_moderation"
 BENCHMARK = "openenv_moderation"
 MAX_STEPS = 8
@@ -50,30 +52,35 @@ def log_end(success: bool, steps: int, rewards: List[float]) -> None:
     avg_reward = sum(rewards) / len(rewards) if rewards else 0.0
     print(f"[END] success={str(success).lower()} steps={steps} avg_reward={avg_reward:.2f} rewards={rewards_str}", flush=True)
 
-def get_model_response(client: OpenAI, content: str, step: int) -> dict:
-    """Get moderation decision from LLM."""
+def extract_json(text: str) -> str:
+    """Robust JSON extraction from LLM response."""
+    # Try looking for JSON code blocks
+    match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)
+    if match:
+        return match.group(1)
+    
+    # Fallback: find anything that looks like a JSON object
+    match = re.search(r'(\{.*?\})', text, re.DOTALL)
+    if match:
+        return match.group(1)
+    
+    return text
+
+def get_model_response(model: genai.GenerativeModel, content: str, step: int) -> dict:
+    """Get moderation decision from Gemini."""
     try:
-        completion = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"Step {step}. Moderate this post:\n\n{content}"},
-            ],
-            temperature=0.3,
-            max_tokens=200,
-            stream=False,
-        )
-        response_text = completion.choices[0].message.content or "{}"
+        chat = model.start_chat(history=[])
+        prompt = f"Step {step}. Moderate this post:\n\n{content}"
         
-        # Clean potential markdown code blocks
-        if "```json" in response_text:
-            response_text = response_text.split("```json")[1].split("```")[0].strip()
-        elif "```" in response_text:
-            response_text = response_text.split("```")[1].split("```")[0].strip()
+        response = chat.send_message(prompt)
+        response_text = response.text or "{}"
+        
+        # Clean and extract JSON
+        json_str = extract_json(response_text)
             
         # Try to parse JSON
         try:
-            parsed = json.loads(response_text)
+            parsed = json.loads(json_str)
             return {
                 "decision": parsed.get("decision", "escalate"),
                 "reasoning": parsed.get("reasoning", "No reasoning provided"),
@@ -87,7 +94,7 @@ def get_model_response(client: OpenAI, content: str, step: int) -> dict:
                 "confidence": 0.3
             }
     except Exception as e:
-        print(f"[DEBUG] LLM request failed: {e}", flush=True)
+        print(f"[DEBUG] Gemini request failed: {e}", flush=True)
         return {
             "decision": "escalate",
             "reasoning": "API error",
@@ -95,12 +102,17 @@ def get_model_response(client: OpenAI, content: str, step: int) -> dict:
         }
 
 async def main() -> None:
-    if not API_KEY:
-        print("[ERROR] HF_TOKEN or API_KEY environment variable not set.")
+    if not GEMINI_API_KEY:
+        print("[ERROR] GEMINI_API_KEY environment variable not set.")
         return
 
-    # Initialize
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    # Initialize Gemini
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel(
+        model_name=MODEL_NAME,
+        system_instruction=SYSTEM_PROMPT
+    )
+    
     env = await ContentModerationEnv.from_env()
     
     rewards: List[float] = []
@@ -115,7 +127,7 @@ async def main() -> None:
         
         for step in range(1, MAX_STEPS + 1):
             # Get LLM decision
-            response = get_model_response(client, obs.content_text, step)
+            response = get_model_response(model, obs.content_text, step)
             action = Action(
                 decision=response["decision"],
                 reasoning=response["reasoning"],
