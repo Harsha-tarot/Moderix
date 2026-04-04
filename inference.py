@@ -120,8 +120,10 @@ async def main() -> None:
     env = await ContentModerationEnv.from_env()
     
     rewards: List[float] = []
+    step_logs: List[dict] = []
     steps_taken = 0
     success = False
+    avg_reward = 0.0
     
     log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
     
@@ -130,8 +132,10 @@ async def main() -> None:
         obs = await env.reset()
         
         for step in range(1, MAX_STEPS + 1):
+            current_content = obs.content_text
+            
             # Get LLM decision
-            response = get_model_response(client, MODEL_NAME, obs.content_text, step)
+            response = get_model_response(client, MODEL_NAME, current_content, step)
             action = Action(
                 decision=response["decision"],
                 reasoning=response["reasoning"],
@@ -143,6 +147,17 @@ async def main() -> None:
             
             rewards.append(reward)
             steps_taken = step
+            
+            step_logs.append({
+                "step": step,
+                "content": current_content,
+                "action": {
+                    "decision": action.decision,
+                    "reasoning": action.reasoning,
+                    "confidence": action.confidence
+                },
+                "reward": reward
+            })
             
             action_short = f"{action.decision}:{action.reasoning[:20]}"
             log_step(step=step, action_short=action_short, reward=reward, done=done, error=None)
@@ -161,6 +176,20 @@ async def main() -> None:
     finally:
         await env.close()
         log_end(success=success, steps=steps_taken, rewards=rewards)
+        
+        # Save evaluation results
+        results = {
+            "summary": {
+                "task": TASK_NAME,
+                "model": MODEL_NAME,
+                "success": success,
+                "steps": steps_taken,
+                "avg_reward": avg_reward
+            },
+            "steps": step_logs
+        }
+        with open("eval_results.json", "w", encoding="utf-8") as f:
+            json.dump(results, f, indent=2)
 
 if __name__ == "__main__":
     asyncio.run(main())
