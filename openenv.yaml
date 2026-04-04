@@ -1,0 +1,62 @@
+name: content-moderation
+version: 1.0.0
+description: "Autonomous content moderation agent that classifies, flags, and routes social media posts across toxicity, spam, and NSFW categories."
+author: "Your Name"
+
+observation:
+  type: object
+  required: [content_id, content_text, source, timestamp]
+  properties:
+    content_id:
+      type: string
+    content_text:
+      type: string
+      description: "Full text of post to moderate"
+    source:
+      type: string
+      enum: ["twitter", "reddit", "discord"]
+    timestamp:
+      type: string
+      format: iso8601
+    metadata:
+      type: object
+
+action:
+  type: object
+  required: [decision, reasoning]
+  properties:
+    decision:
+      type: string
+      enum: ["approve", "review", "reject", "escalate"]
+    reasoning:
+      type: string
+    confidence:
+      type: number
+      minimum: 0.0
+      maximum: 1.0
+
+reward:
+  type: number
+  minimum: 0.0
+  maximum: 1.0
+
+tasks:
+  - id: toxicity_detection
+    name: Toxicity Detection
+    description: Classify posts for toxic language severity
+    difficulty: easy
+    
+  - id: spam_classification
+    name: Spam Classification
+    description: Binary spam vs legitimate
+    difficulty: medium
+    
+  - id: nsfw_detection
+    name: NSFW Detection
+    description: Categorize inappropriate content
+    difficulty: hard
+    
+  - id: reasoning_quality
+    name: Reasoning Quality
+    description: Justification quality
+    difficulty: medium

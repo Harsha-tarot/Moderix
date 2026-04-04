@@ -3,9 +3,19 @@ import json
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List, Tuple
 from pydantic import BaseModel, Field
-import json
+
+# Import graders
+try:
+    from graders.toxicity_grader import grade_toxicity
+    from graders.spam_grader import grade_spam
+    from graders.nsfw_grader import grade_nsfw
+except ImportError:
+    # Fallback to dummy graders if not available yet
+    def grade_toxicity(content, pred, gold): return 0.5
+    def grade_spam(content, pred, gold): return 0.5
+    def grade_nsfw(content, pred, gold): return 0.5
 
 class Observation(BaseModel):
     """What the agent observes at each step."""
@@ -36,15 +46,27 @@ class ContentModerationEnv:
         
     async def initialize(self):
         """Load gold labels and initialize."""
-        ### STEP 1: Load training_set.json from data/
+        print("[DEBUG] Initializing ContentModerationEnv...")
         try:
-            with open("data/training_set.json", "r") as f:
+            # Look for training_set.json in data/
+            data_path = os.path.join(os.path.dirname(__file__), "data", "training_set.json")
+            print(f"[DEBUG] Attempting to load dataset from: {data_path}")
+            if not os.path.exists(data_path):
+                # Try relative if above failed
+                data_path = "data/training_set.json"
+                print(f"[DEBUG] Path doesn't exist, falling back to: {data_path}")
+                
+            with open(data_path, "r") as f:
                 dataset = json.load(f)
                 self.gold_labels = {item["id"]: item for item in dataset}
                 print(f"[INFO] Loaded {len(self.gold_labels)} gold labels")
         except FileNotFoundError:
             print("[WARN] training_set.json not found, using empty labels")
             self.gold_labels = {}
+        except Exception as e:
+            print(f"[ERROR] Failed to load dataset: {e}")
+            self.gold_labels = {}
+        print("[DEBUG] Initialization complete")
     
     async def reset(self) -> Observation:
         """Initialize a new episode."""
@@ -52,9 +74,15 @@ class ContentModerationEnv:
         self.episode_rewards = []
         self.decisions_made = []
         
-        ### STEP 2: Load a batch of posts (8 posts from gold_labels)
-        posts = list(self.gold_labels.values())[:8]
-        self.current_batch = posts
+        # Load a batch of posts (8 posts from gold_labels)
+        import random
+        all_posts = list(self.gold_labels.values())
+        if len(all_posts) < 8:
+            self.current_batch = all_posts
+        else:
+            # Pick 8 random posts for variety
+            self.current_batch = random.sample(all_posts, 8)
+            
         self.batch_index = 0
         
         if not self.current_batch:
@@ -92,7 +120,7 @@ class ContentModerationEnv:
                 timestamp=datetime.now(timezone.utc).isoformat()
             ), 0.0, True, {"error": "No more posts"}
         
-        ### STEP 3: Grade this decision against gold labels
+        # Grade this decision against gold labels
         reward = self._grade_decision(action, current_post)
         self.episode_rewards.append(reward)
         self.decisions_made.append(action.decision)
@@ -130,30 +158,35 @@ class ContentModerationEnv:
         return obs, reward, done, info
     
     def _grade_decision(self, action: Action, post: dict) -> float:
-        """Grade the agent's decision against gold labels."""
-        ### STEP 4: Implement grading logic
-        
+        """Grade the agent's decision against gold labels across 3 tasks."""
         decision = action.decision.lower()
         confidence = action.confidence
         
-        # Simple accuracy-based grading
-        # Toxicity task
-        if "toxicity" in post:
-            gold_tox = post["toxicity"]
-            if gold_tox > 0.5:  # Toxic post
-                if decision in ["review", "reject"]:
-                    reward = 0.8 + 0.2 * min(confidence, 0.5)
-                else:
-                    reward = 0.1
-            else:  # Safe post
-                if decision == "approve":
-                    reward = 0.9 + 0.1 * confidence
-                else:
-                    reward = 0.3
-        else:
-            reward = 0.5  # Neutral if no gold label
+        # 1. Toxicity Grading
+        # Map decision to a score (reject -> high score, approve -> low score)
+        pred_tox = 0.9 if decision in ["reject", "review"] else 0.1
+        tox_reward = grade_toxicity(post["content"], pred_tox, post.get("toxicity", 0.0))
         
-        return min(max(reward, 0.0), 1.0)  # Clamp to [0, 1]
+        # 2. Spam Grading
+        pred_spam = True if decision == "reject" else False
+        spam_reward = grade_spam(post["content"], pred_spam, post.get("spam", False))
+        
+        # 3. NSFW Grading
+        pred_nsfw = post.get("nsfw_category", "safe") if decision == "reject" else "safe"
+        nsfw_reward = grade_nsfw(post["content"], pred_nsfw, post.get("nsfw_category", "safe"))
+        
+        # Average the rewards
+        base_reward = (tox_reward + spam_reward + nsfw_reward) / 3.0
+        
+        # Calibration bonus/penalty
+        # If reward is high and confidence is high, bonus.
+        # If reward is low and confidence is high, penalty.
+        if base_reward > 0.7:
+            final_reward = base_reward * (0.8 + 0.2 * confidence)
+        else:
+            final_reward = base_reward * (1.2 - 0.2 * confidence)
+            
+        return min(max(final_reward, 0.0), 1.0)
     
     async def state(self) -> dict:
         """Return current episode state."""
@@ -171,15 +204,22 @@ class ContentModerationEnv:
         pass
     
     @classmethod
-    async def from_docker_image(cls, image_name: str):
-        """For HF Space compatibility."""
-        env = cls()
-        await env.initialize()
-        return env
-    
-    @classmethod
     async def from_env(cls, **kwargs):
-        """Initialize from environment variables."""
+        """Initialize from environment."""
         env = cls(**kwargs)
         await env.initialize()
         return env
+
+if __name__ == "__main__":
+    async def test():
+        env = await ContentModerationEnv.from_env()
+        obs = await env.reset()
+        print(f"Reset: {obs.content_id}, {obs.content_text[:50]}")
+        
+        action = Action(decision="approve", reasoning="Safe post", confidence=0.8)
+        obs, reward, done, info = await env.step(action)
+        print(f"Step 1: reward={reward}, done={done}")
+        
+        await env.close()
+    
+    asyncio.run(test())
