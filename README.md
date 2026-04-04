@@ -121,8 +121,6 @@ export GEMINI_API_KEY="your_gemini_api_key_here"
 export GEMINI_MODEL_NAME="gemini-1.5-flash"
 ```
 
-*Complete setup guide in [REQUIREMENTS.md](REQUIREMENTS.md)*
-
 ---
 
 ## 💻 Usage Examples
@@ -170,11 +168,6 @@ python inference.py
 ```
 Moderix/
 ├── README.md               # This file
-├── REQUIREMENTS.md         # Setup & configuration
-├── ARCHITECTURE.md         # System design overview
-├── MODULES.md              # Internal module reference
-├── AGENTS.md               # Agent implementation guide
-├── TASKS.md                # Task specifications
 ├── my_env.py               # Core environment
 ├── inference.py            # Baseline script
 ├── Dockerfile              # Containerization
@@ -186,8 +179,6 @@ Moderix/
     ├── spam_grader.py
     └── nsfw_grader.py
 ```
-
-*Detailed module documentation in [MODULES.md](MODULES.md)*
 
 ---
 
@@ -218,8 +209,6 @@ We welcome contributions! Areas for improvement:
 - Enhanced datasets
 - Improved grading algorithms
 - Additional baseline models
-
-*See [AGENTS.md](AGENTS.md) for implementing custom agents.*
 
 ---
 

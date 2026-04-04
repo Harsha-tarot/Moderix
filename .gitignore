@@ -162,7 +162,7 @@ IMPLEMENTATION_START_HERE.md
 
 files-recurrsive.txt
 files.txt
-
+.gitignore
 #unwanted files
 *.log
 *.tmp
