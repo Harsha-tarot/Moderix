@@ -4,7 +4,7 @@ import os
 import json
 import re
 from typing import List, Optional
-import google.generativeai as genai
+from openai import OpenAI
 from my_env import ContentModerationEnv, Action
 from dotenv import load_dotenv
 
@@ -13,7 +13,7 @@ load_dotenv()
 
 # Gemini Configuration
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
+MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 
 TASK_NAME = "content_moderation"
 BENCHMARK = "openenv_moderation"
@@ -66,14 +66,19 @@ def extract_json(text: str) -> str:
     
     return text
 
-def get_model_response(model: genai.GenerativeModel, content: str, step: int) -> dict:
-    """Get moderation decision from Gemini."""
+def get_model_response(client: OpenAI, model_name: str, content: str, step: int) -> dict:
+    """Get moderation decision from Gemini via OpenAI SDK."""
     try:
-        chat = model.start_chat(history=[])
         prompt = f"Step {step}. Moderate this post:\n\n{content}"
         
-        response = chat.send_message(prompt)
-        response_text = response.text or "{}"
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        response_text = response.choices[0].message.content or "{}"
         
         # Clean and extract JSON
         json_str = extract_json(response_text)
@@ -106,18 +111,19 @@ async def main() -> None:
         print("[ERROR] GEMINI_API_KEY environment variable not set.")
         return
 
-    # Initialize Gemini
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel(
-        model_name=MODEL_NAME,
-        system_instruction=SYSTEM_PROMPT
+    # Initialize OpenAI Client for Gemini
+    client = OpenAI(
+        api_key=GEMINI_API_KEY,
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
     )
     
     env = await ContentModerationEnv.from_env()
     
     rewards: List[float] = []
+    step_logs: List[dict] = []
     steps_taken = 0
     success = False
+    avg_reward = 0.0
     
     log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
     
@@ -126,8 +132,10 @@ async def main() -> None:
         obs = await env.reset()
         
         for step in range(1, MAX_STEPS + 1):
+            current_content = obs.content_text
+            
             # Get LLM decision
-            response = get_model_response(model, obs.content_text, step)
+            response = get_model_response(client, MODEL_NAME, current_content, step)
             action = Action(
                 decision=response["decision"],
                 reasoning=response["reasoning"],
@@ -140,11 +148,25 @@ async def main() -> None:
             rewards.append(reward)
             steps_taken = step
             
+            step_logs.append({
+                "step": step,
+                "content": current_content,
+                "action": {
+                    "decision": action.decision,
+                    "reasoning": action.reasoning,
+                    "confidence": action.confidence
+                },
+                "reward": reward
+            })
+            
             action_short = f"{action.decision}:{action.reasoning[:20]}"
             log_step(step=step, action_short=action_short, reward=reward, done=done, error=None)
             
             if done:
                 break
+            
+            # Avoid Gemini free tier rate limit: 5 requests per minute
+            await asyncio.sleep(15)
         
         avg_reward = sum(rewards) / len(rewards) if rewards else 0.0
         success = avg_reward >= 0.5  # Threshold for success
@@ -154,6 +176,20 @@ async def main() -> None:
     finally:
         await env.close()
         log_end(success=success, steps=steps_taken, rewards=rewards)
+        
+        # Save evaluation results
+        results = {
+            "summary": {
+                "task": TASK_NAME,
+                "model": MODEL_NAME,
+                "success": success,
+                "steps": steps_taken,
+                "avg_reward": avg_reward
+            },
+            "steps": step_logs
+        }
+        with open("eval_results.json", "w", encoding="utf-8") as f:
+            json.dump(results, f, indent=2)
 
 if __name__ == "__main__":
     asyncio.run(main())
