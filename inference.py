@@ -19,6 +19,13 @@ API_BASE_URL = os.environ.get("API_BASE_URL", os.getenv("API_BASE_URL"))
 MODEL_NAME = os.environ.get("MODEL_NAME", os.getenv("MODEL_NAME"))
 HF_TOKEN = os.environ.get("HF_TOKEN", os.getenv("HF_TOKEN"))
 
+# Fallbacks for Gemini if OpenEnv not fully set
+if not API_BASE_URL and os.getenv("GEMINI_API_KEY"):
+    API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    HF_TOKEN = os.getenv("GEMINI_API_KEY")
+    if not MODEL_NAME:
+        MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
+
 TASK_NAME = "content_moderation"
 BENCHMARK = "openenv_moderation"
 MAX_STEPS = 8
@@ -90,6 +97,8 @@ async def get_model_response(client: AsyncOpenAI, content: str, step: int) -> di
             temperature=0.0,
         )
         response_text = response.choices[0].message.content or "{}"
+
+        # Clean and extract JSON
         json_str = extract_json(response_text)
 
         try:
@@ -141,6 +150,7 @@ async def main() -> None:
         for step in range(1, MAX_STEPS + 1):
             current_content = obs.content_text
 
+            # Get LLM decision
             response = await get_model_response(client, current_content, step)
             action = Action(
                 decision=response["decision"],
@@ -184,8 +194,9 @@ async def main() -> None:
             if done:
                 break
 
-            # Rate limiting sleep just in case
-            await asyncio.sleep(1)
+            # Avoid Gemini free tier rate limit if we're using Gemini fallback
+            if "generativelanguage" in str(API_BASE_URL):
+                await asyncio.sleep(15)
 
         avg_reward = sum(rewards) / len(rewards) if rewards else 0.0
         success = avg_reward >= 0.5
