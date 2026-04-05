@@ -1,3 +1,7 @@
+import os
+
+os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 import asyncio
 import json
 import os
@@ -20,11 +24,13 @@ API_BASE_URL = os.environ.get("API_BASE_URL", os.getenv("API_BASE_URL"))
 MODEL_NAME = os.environ.get("MODEL_NAME", os.getenv("MODEL_NAME"))
 HF_TOKEN = os.environ.get("HF_TOKEN", os.getenv("HF_TOKEN"))
 
-# Fallbacks for Gemini if OpenEnv not fully set
-if not API_BASE_URL and os.getenv("GEMINI_API_KEY"):
+# Fallbacks for Gemini if OpenEnv not fully set or user left placeholder token
+if (not API_BASE_URL or "your_openai_or_hf_token_here" in str(HF_TOKEN)) and os.getenv(
+    "GEMINI_API_KEY"
+):
     API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
     HF_TOKEN = os.getenv("GEMINI_API_KEY")
-    if not MODEL_NAME:
+    if not MODEL_NAME or "gpt-4o-mini" in str(MODEL_NAME):
         MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 
 TASK_NAME = "content_moderation"
@@ -85,21 +91,29 @@ def extract_json(text: str) -> str:
     return text
 
 
-@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=2, max=30))
+@retry(
+    stop=stop_after_attempt(6),
+    wait=wait_exponential(multiplier=1, min=2, max=60),
+    reraise=True,
+)
+async def _call_api(client: AsyncOpenAI, prompt: str) -> str:
+    response = await client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.0,
+    )
+    return response.choices[0].message.content or "{}"
+
+
 async def get_model_response(client: AsyncOpenAI, content: str, step: int) -> dict:
     """Get moderation decision from OpenAI-compatible API."""
     try:
         prompt = f"Step {step}. Moderate this post:\n\n{content}"
 
-        response = await client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-            temperature=0.0,
-        )
-        response_text = response.choices[0].message.content or "{}"
+        response_text = await _call_api(client, prompt)
 
         # Clean and extract JSON
         json_str = extract_json(response_text)
@@ -113,7 +127,11 @@ async def get_model_response(client: AsyncOpenAI, content: str, step: int) -> di
                 "confidence": float(parsed.get("confidence", 0.5)),
             }
         except json.JSONDecodeError:
-            print(f"[DEBUG] LLM response not JSON: {response_text[:100]}", flush=True)
+            print(
+                f"[DEBUG] LLM response not JSON: {response_text[:100]}",
+                flush=True,
+                file=sys.stderr,
+            )
             return {
                 "decision": "escalate",
                 "violation_type": "none",
@@ -121,7 +139,7 @@ async def get_model_response(client: AsyncOpenAI, content: str, step: int) -> di
                 "confidence": 0.3,
             }
     except Exception as e:
-        print(f"[DEBUG] API request failed: {e}", flush=True)
+        print(f"[DEBUG] API request failed: {e}", flush=True, file=sys.stderr)
         return {
             "decision": "escalate",
             "violation_type": "none",
@@ -210,7 +228,7 @@ async def main() -> None:
         success = avg_reward >= 0.5
 
     except Exception as e:
-        print(f"[DEBUG] Episode error: {e}", flush=True)
+        print(f"[DEBUG] Episode error: {e}", flush=True, file=sys.stderr)
         log_step(
             step=steps_taken + 1,
             action_short="error",

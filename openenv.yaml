@@ -18,6 +18,12 @@ observation:
     timestamp:
       type: string
       format: iso8601
+    user_reputation:
+      type: number
+    thread_history:
+      type: array
+      items:
+        type: string
     metadata:
       type: object
 
@@ -27,7 +33,7 @@ action:
   properties:
     decision:
       type: string
-      enum: ["approve", "review", "reject", "escalate"]
+      enum: ["approve", "review", "reject", "escalate", "ban_user"]
     violation_type:
       type: string
       enum:
