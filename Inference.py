@@ -92,8 +92,8 @@ def extract_json(text: str) -> str:
 
 
 @retry(
-    stop=stop_after_attempt(6),
-    wait=wait_exponential(multiplier=1, min=2, max=60),
+    stop=stop_after_attempt(10),
+    wait=wait_exponential(multiplier=2, min=5, max=120),
     reraise=True,
 )
 async def _call_api(client: AsyncOpenAI, prompt: str) -> str:

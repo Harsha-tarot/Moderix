@@ -1,6 +1,8 @@
 import asyncio
 
 import pytest
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 from my_env import Action, ContentModerationEnv
 

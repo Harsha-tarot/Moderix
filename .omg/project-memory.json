@@ -1,0 +1,117 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1775420331039,
+  "projectRoot": "/home/whysooraj/Documents/moderix",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Python",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "requirements.txt"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "pip",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "tests"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "__pycache__": {
+      "path": "__pycache__",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1775420331037,
+      "keyFiles": [
+        "Inference.cpython-314.pyc",
+        "inference.cpython-314.pyc",
+        "my_env.cpython-314-pytest-8.4.2.pyc",
+        "my_env.cpython-314.pyc"
+      ]
+    },
+    "data": {
+      "path": "data",
+      "purpose": "Data files",
+      "fileCount": 1,
+      "lastAccessed": 1775420331038,
+      "keyFiles": [
+        "training_set.json"
+      ]
+    },
+    "graders": {
+      "path": "graders",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1775420331038,
+      "keyFiles": [
+        "__init__.py",
+        "nsfw_grader.py",
+        "reasoning_grader.py",
+        "spam_grader.py",
+        "toxicity_grader.py"
+      ]
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 2,
+      "lastAccessed": 1775420331038,
+      "keyFiles": [
+        "test_env.py",
+        "test_graders.py"
+      ]
+    },
+    "venv": {
+      "path": "venv",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1775420331039,
+      "keyFiles": [
+        "pyvenv.cfg"
+      ]
+    },
+    "venv/bin": {
+      "path": "venv/bin",
+      "purpose": "Executable scripts",
+      "fileCount": 28,
+      "lastAccessed": 1775420331039,
+      "keyFiles": [
+        "Activate.ps1",
+        "activate",
+        "activate.csh"
+      ]
+    },
+    "venv/lib": {
+      "path": "venv/lib",
+      "purpose": "Library code",
+      "fileCount": 0,
+      "lastAccessed": 1775420331039,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [],
+  "userDirectives": []
+}
