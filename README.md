@@ -116,10 +116,33 @@ pip install -r requirements.txt
 ```
 
 ### Environment Variables
+The environment supports flexible model plugging via OpenAI-compatible APIs, allowing instructors and developers to test with OpenAI, HuggingFace, or local models. For local development without configuring endpoints, there is a built-in fallback for Google Gemini.
+
+Copy the `.env.example` to `.env` and fill in your credentials:
+```bash
+cp .env.example .env
+```
+
+**For OpenEnv / Instructors (OpenAI, HuggingFace, Local Models):**
+```bash
+export API_BASE_URL="https://api.openai.com/v1" # Or local endpoint like http://localhost:8000/v1
+export MODEL_NAME="gpt-4o-mini"
+export HF_TOKEN="your_openai_or_hf_token_here"
+```
+
+**For Local Testing (Gemini Fallback):**
 ```bash
 export GEMINI_API_KEY="your_gemini_api_key_here"
-export GEMINI_MODEL_NAME="gemini-1.5-flash"
+export GEMINI_MODEL_NAME="gemini-2.5-flash"
 ```
+
+### Supported Models & Minimum Specs
+To ensure the agent correctly formats the complex JSON responses and accurately performs nuanced reasoning, the following minimum specifications are recommended:
+- **Parameter Count**: At least 7B parameters.
+- **Context Window**: Minimum 8K tokens.
+- **Capabilities**: Strong instruction-following and structured JSON output capabilities.
+- **Recommended Local Models**: `Qwen/Qwen2.5-7B-Instruct`, `meta-llama/Llama-3.1-8B-Instruct` (served via vLLM or Ollama).
+- **Recommended Cloud Models**: `gpt-4o-mini`, `gemini-2.5-flash`, `claude-3-5-haiku`.
 
 ---
 
@@ -283,10 +306,16 @@ pip install -r requirements.txt
 ```
 
 ### Environment Variables
-Create a `.env` file in the root directory or export these variables directly to your shell:
+Create a `.env` file from the `.env.example` file in the root directory or export these variables directly to your shell:
 ```bash
+# OpenEnv Setup
+export API_BASE_URL="https://api.openai.com/v1"
+export MODEL_NAME="gpt-4o-mini"
+export HF_TOKEN="your_api_key"
+
+# Gemini Fallback Setup
 export GEMINI_API_KEY="your_gemini_api_key_here"
-export GEMINI_MODEL_NAME="gemini-1.5-flash"
+export GEMINI_MODEL_NAME="gemini-2.5-flash"
 ```
 
 ## 11. Usage
@@ -354,8 +383,9 @@ Moderix/
 ```
 
 ## 14. API Credentials Required
-- **GEMINI_API_KEY**: Your Google AI Studio API token. Generate one at [aistudio.google.com](https://aistudio.google.com).
-- **GEMINI_MODEL_NAME**: The specific model identifier. `gemini-1.5-flash` or `gemini-1.5-pro` are recommended.
+- **HF_TOKEN / OpenAI Key**: Used when evaluating via the OpenEnv standard `API_BASE_URL`. Required for OpenAI, HuggingFace Inference API, or any OpenAI-compatible endpoint.
+- **GEMINI_API_KEY**: Your Google AI Studio API token (used as a fallback for local testing). Generate one at [aistudio.google.com](https://aistudio.google.com).
+- **Model Identifiers**: Whether using `MODEL_NAME` (OpenAI standard) or `GEMINI_MODEL_NAME` (fallback), specify the exact model string (e.g., `gpt-4o-mini`, `gemini-2.5-flash`, `Qwen/Qwen2.5-72B-Instruct`).
 
 ## 15. Evaluation Criteria
 
